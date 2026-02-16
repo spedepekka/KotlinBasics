@@ -2,52 +2,51 @@ package fi.kranu
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlin.random.Random
 
 /**
- * 1. Suspend Functions:
- * Functions marked with 'suspend' can be paused and resumed without blocking the thread.
- * They can only be called from other suspend functions or a coroutine.
+ * Simulates an external service with random response time.
  */
-suspend fun fetchData(): String {
-    delay(1000) // Non-blocking delay
-    return "Data from network"
-}
-
-/**
- * 2. Flow:
- * Asynchronous stream of values. Similar to Reactive Streams but simpler and
- * built on top of coroutines.
- */
-fun getNumbersFlow(): Flow<Int> = flow {
-    for (i in 1..3) {
-        delay(500)
-        emit(i) // Send value to collector
-    }
+suspend fun fetchFromService(serviceName: String): String {
+    val delayTime = Random.nextLong(500, 3000)
+    println("[$serviceName] starting (will take ${delayTime}ms)...")
+    delay(delayTime)
+    return "[$serviceName] Response"
 }
 
 fun main() = runBlocking {
+    println("--- Complex Coroutine Example: Parallel Services ---")
+    val startTime = System.currentTimeMillis()
+
     /**
-     * 3. Coroutine Scope & Structured Concurrency:
-     * 'runBlocking' creates a scope that waits for all its children to finish.
-     * This ensures that no coroutines are leaked (Structured Concurrency).
+     * Parallel Execution using 'async':
+     * We launch multiple coroutines concurrently. 
+     * Each 'async' returns a 'Deferred' object (a promise of a future value).
      */
-    println("Main started on ${Thread.currentThread().name}")
+    val service1 = async { fetchFromService("Auth-Service") }
+    val service2 = async { fetchFromService("Payment-Gateway") }
+    val service3 = async { fetchFromService("Inventory-Check") }
 
-    // Launching a child coroutine
-    launch {
-        val result = fetchData()
-        println("Result: $result (on ${Thread.currentThread().name})")
-    }
+    println("All services triggered. Waiting for all to complete...")
 
-    println("Fetching numbers via Flow...")
+    /**
+     * Waiting for results:
+     * 'awaitAll' suspends the current coroutine until all provided Deferreds are finished.
+     * This is structured concurrency in action: we manage multiple tasks as a single unit.
+     */
+    val results = awaitAll(service1, service2, service3)
+    
+    val totalTime = System.currentTimeMillis() - startTime
+    
+    println("\nAll services finished!")
+    results.forEach { println("Received: $it") }
+    println("Total execution time: ${totalTime}ms (vs sequential ~${results.size * 1500}ms)")
 
-    // 4. Flow vs Reactive Streams:
-    // Flows are cold (start when collected) and sequential by default.
-    getNumbersFlow()
-        .map { it * 2 }
-        .collect { value ->
-            println("Flow received: $value")
-        }
+    println("\n--- Flow Example ---")
+    // Flows are cold and sequential by default.
+    flowOf("Task A", "Task B", "Task C")
+        .onEach { delay(Random.nextLong(100, 500)) }
+        .collect { println("Flow processed: $it") }
 
     println("Main finished")
 }
