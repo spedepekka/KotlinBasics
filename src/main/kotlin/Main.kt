@@ -1,42 +1,49 @@
 package fi.kranu
 
-/**
- * Value Object Modeling:
- * We use a data class to represent a "User". 
- * It's a value object because its identity is defined by its data.
- * By using 'val', we ensure immutability.
- *
- * data class creates methods like equals(), hashCode() and toString() automatically
- */
 data class User(
     val id: Int,
     val name: String,
     val email: String
 )
 
+/**
+ * Extension Function:
+ * We "extend" the String class with a new function called 'shout'.
+ * Inside the function, 'this' refers to the actual string instance.
+ */
+fun String.shout(): String {
+    return this.uppercase() + "!!!"
+}
+
+/**
+ * Extension Function for a custom class:
+ * Formats user info for display.
+ */
+fun User.getDisplayName(): String {
+    return "$name <$email> (ID: $id)"
+}
+
+/**
+ * Nullable Extension Function:
+ * Can be called even if the reference is null.
+ */
+fun String?.orEmptyMessage(): String {
+    return this ?: "No message provided"
+}
+
 fun main() {
-    // 1. Creation
-    val user1 = User(1, "Alice", "alice@example.com")
-    println("Original User: $user1")
+    // 1. Using extension on standard type
+    val greeting = "hello world"
+    println(greeting.shout()) // HELLO WORLD!!!
 
-    // 2. Immutability & copy()
-    // Instead of changing user1 (which is impossible with 'val'), 
-    // we create a new instance with specific changes.
-    val user2 = user1.copy(name = "Alice Smith")
-    println("Updated User (via copy): $user2")
-    println("Are they the same instance? ${user1 === user2}") // false
+    // 2. Using extension on custom type
+    val user = User(1, "Alice", "alice@example.com")
+    println(user.getDisplayName())
 
-    // 3. Destructuring
-    // Data classes allow unpacking properties into separate variables.
-    // Warning: Apparently this is just by ordering
-    val (id, name, email) = user2
-    println("Destructured: ID=$id, Name=$name, Email=$email")
-
-    // 4. Component functions (used under the hood by destructuring)
-    val nameViaComponent = user2.component2()
-    println("Name via component2(): $nameViaComponent")
-
-    with(user2) {
-        println("User details: ID=$id, Name=$name, Email=$email")
-    }
+    // 3. Using nullable extension
+    val nullableString: String? = null
+    println(nullableString.orEmptyMessage()) // No message provided
+    
+    val actualString: String? = "Kotlin"
+    println(actualString.orEmptyMessage()) // Kotlin
 }
