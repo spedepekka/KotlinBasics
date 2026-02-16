@@ -16,7 +16,7 @@ suspend fun fetchFromService(serviceName: String): String {
 
 fun main() = runBlocking {
     println("--- Complex Coroutine Example: Parallel Services ---")
-    val startTime = System.currentTimeMillis()
+    var startTime = System.currentTimeMillis()
 
     /**
      * Parallel Execution using 'async':
@@ -36,17 +36,56 @@ fun main() = runBlocking {
      */
     val results = awaitAll(service1, service2, service3)
     
-    val totalTime = System.currentTimeMillis() - startTime
+    var totalTime = System.currentTimeMillis() - startTime
     
     println("\nAll services finished!")
     results.forEach { println("Received: $it") }
     println("Total execution time: ${totalTime}ms (vs sequential ~${results.size * 1500}ms)")
 
-    println("\n--- Flow Example ---")
-    // Flows are cold and sequential by default.
-    flowOf("Task A", "Task B", "Task C")
-        .onEach { delay(Random.nextLong(100, 500)) }
-        .collect { println("Flow processed: $it") }
+    println("\n--- Flow Concurrency Examples ---")
 
-    println("Main finished")
+    // 1. buffer(): Decouples emitter and collector
+    // Emitter runs in a separate coroutine. It can keep producing items 
+    // while the collector is busy processing.
+    println("\n[buffer] Decoupling emitter and collector:")
+    val bufferTime = System.currentTimeMillis()
+    flow {
+        repeat(100) {
+            //delay(Random.nextLong(1, 1000)) // Simulate fast production
+            println("Emitting $it")
+            emit(it)
+        }
+    }
+    .buffer() // Emitter works ahead!
+    .collect {
+        delay(10) // Simulate slow processing
+        println("Collected $it")
+    }
+
+    // 2. flowOn(): Changes the context (thread) of the UPSTREAM flow
+    println("\n[flowOn] Moving emission to a background thread:")
+    flow {
+        println("Emitter running on: ${Thread.currentThread().name}")
+        emit("Data")
+    }
+    .flowOn(Dispatchers.Default) // Upstream runs on worker thread
+    .collect {
+        println("Collector running on: ${Thread.currentThread().name}")
+    }
+
+    // 3. flatMapMerge(): Parallel processing of items
+    println("\n[flatMapMerge] Processing multiple items in parallel:")
+    val mergeTime = System.currentTimeMillis()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    flowOf("Task 1", "Task 2", "Task 3")
+        .flatMapMerge { task ->
+            flow {
+                delay(500) // Each sub-flow takes time
+                emit("Finished $task")
+            }
+        }
+        .collect { println(it) }
+    println("flatMapMerge time: ${System.currentTimeMillis() - mergeTime}ms (vs ~1500ms sequential)")
+
+    println("\nMain finished")
 }
