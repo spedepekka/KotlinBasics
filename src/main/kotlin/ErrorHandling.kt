@@ -22,6 +22,14 @@ fun main() {
 
     println("\n--- Spring-style Error Handling Patterns ---")
     springStyleExample()
+
+    println("\n--- Input Parsing ---")
+    inputParseExample()
+
+    println("\n--- Spring Boot like situation ---")
+    springBootLikeExample()
+
+    println("\n--- End ---")
 }
 
 // 1. Traditional Try-Catch
@@ -80,6 +88,7 @@ fun kotlinResultExample() {
 // This is the common pattern in functional programming (Arrow library).
 // Either<L, R> represents a value of one of two possible types (Left or Right).
 // By convention, Left is used for Failure and Right for Success ("Right is Right").
+// Either is often preferred over Result because it can hold any error type, not just exceptions.
 
 sealed class Either<out L, out R> {
     data class Left<out L>(val value: L) : Either<L, Nothing>()
@@ -193,3 +202,79 @@ fun springStyleExample() {
  *   repository.findById(id).bind()
  * }
  */
+
+/**
+ * Kotlin’s Built-in Result Type
+ * Kotlin provides a standard Result<T> class to represent success or failure of operations.
+ *
+ * Result is a sealed class wrapping either a success value or a failure (exception).
+ * It is inline and optimized.
+ * Provides functional combinators like map, fold, getOrElse, etc.
+ */
+fun parseIntResult(str: String): Result<Int> =
+    runCatching { str.toInt() }
+
+fun inputParseExample() {
+    val result = parseIntResult("123")
+    result
+        .onSuccess { println("Parsed number: $it") }
+        .onFailure { println("Failed to parse: ${it.message}") }
+    val result2 = parseIntResult("lol")
+    val what = result2
+        .onSuccess { println("Parsed number: $it") }
+        .onFailure { println("Failed to parse: ${it.message}") }
+
+    println("Parsed number: ${parseIntResult("123").getOrElse { 0 }}")
+    println("Parsed number: ${parseIntResult("asdf").getOrElse { 0 }}")
+
+    // This is Failure(java.lang.NumberFormatException: For input string: "lol")
+    println("what: $what")
+}
+
+data class User2(val id: String, val ageString: String)
+
+interface UserRepository2 {
+    fun findById(id: String): User2?
+}
+
+class UserService2(private val userRepository: UserRepository2) {
+
+    fun getUserAge(id: String): Result<Int> {
+        val user = userRepository.findById(id)
+            ?: return Result.failure(NoSuchElementException("User not found"))
+
+        return runCatching { user.ageString.toInt() }
+    }
+}
+
+val userRepository = object : UserRepository2 {
+    override fun findById(id: String): User2? = User2(id, "25")
+}
+
+fun springBootLikeExample() {
+    val userService = UserService2(userRepository)
+
+    val ageResult = userService.getUserAge("user-123")
+
+    val what2 = ageResult.fold(
+        onSuccess = { age -> println("User age is $age"); age},
+        onFailure = { error -> println("Error: ${error.message}"); 0 }
+    )
+
+    // This would be kotlin.Unit if the last expression would be println
+    // And the last expression is the return value
+    println("what 2: $what2")
+
+    /**
+     * What is the difference between onSuccess and fold?
+     *
+     * Imagine a physical package (the Result):
+     *
+     * onSuccess is like a sticker on the outside of the box that says: "When this box is opened, if there's a toy
+     * inside, paint it red." You haven't opened the box yet; you've just added an instruction.
+     *
+     * fold is like actually opening the box: "Take out what's inside. If it's a toy, put it on the shelf. If the box
+     * is empty, put a 'Sold Out' sign on the shelf instead." After this, the box is gone, and you just have a toy or
+     * a sign.
+     */
+}
